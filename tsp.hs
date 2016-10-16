@@ -17,10 +17,15 @@
 -- kan wel zoeken naar opeenvolgende steden die in de route erg dicht bij elkaar zitten
 -- je kan een soort gemiddelde afstand berekenen en dan kijken wat daar (ver?) onder ligt
 
+import Data.List
 
 type City = (Float, Float)
-type Tour = [City]
-type Population = [Tour]
+type Route = [City]
+type Population = [Route]
+type Map = [City] 
+
+dim :: Int
+dim = 20
 
 -- variabelen: population_size
 
@@ -35,3 +40,25 @@ type Population = [Tour]
 -- onderdelen: calcFitness : de lengte van de route
 -- verschillende selection manieren bekijken (+ implementeren?)
 
+
+-- met dat framework: eigen showGeneration maken
+
+
+-- bepalen: dimensies van kaart en hoe weer te geven?
+-- functie displayRoute
+
+displayRow :: [Int] -> IO()
+displayRow cities = 
+	let str = foldl (\y x -> if elem x cities then y ++ "x" else y ++ "-") "" [0..20]
+	in do putStrLn str
+
+
+
+displayMap :: IO()
+displayMap = do
+	putStrLn "--+---------+---x-----*---"
+	putStrLn "+------+----------x----*--"
+
+
+--displayRoute :: Route -> IO()
+--displayRoute route = 
