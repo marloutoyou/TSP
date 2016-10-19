@@ -66,7 +66,7 @@ dim = 20
 big :: Float
 big = 100000
 
--- variabelen: population_size
+-- variabelen: population_size enzo ook hier? dan kan je alles makkelijk vanaf bovenaan instellen
 
 dumMap :: Map
 dumMap = [(1,5),(20,20),(6,4),(7,15),(12,4)]
