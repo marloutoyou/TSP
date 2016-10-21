@@ -40,6 +40,9 @@
 -- bepalen: dimensies van kaart en hoe weer te geven?
 -- functie displayRoute
 
+
+-- Monad IO gebruiken?? Dus overal waar m --> IO
+
 ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -49,6 +52,7 @@
 ---------------------------------------------
 
 import Data.List
+import System.Random
 import GA
 
 type City = (Integer, Integer)
@@ -153,7 +157,7 @@ findPath route =
       rest = tail route
       in if slope == big
         then calcVertical city1 city2 ++ findPath rest
-        else if slope > 1
+        else if abs slope > 1
           then calcViaY city1 city2 slope b ++ findPath rest
           else calcViaX city1 city2 slope b ++ findPath rest
 
@@ -176,14 +180,13 @@ displayRoute route path dim = putStrLn (displayRowRoute route path dim) >> displ
 -- GENERAL STUFF FOR THE GA ALGORITHM
 -----------------------------------------
 
--- generating the pool:
+-- all possible coordinates, needed for creating a pool (= map):
 allCoordinates :: [City]
 allCoordinates = [(x,y) | x <- [0..dim], y <- [0..dim]]
 
 -- fitness:
 -- calculate length of route, returned as a float
 -- requires that the first and the last element of route are equal (to make a circle)
--- NOG TESTEN
 calcLength :: Route -> Float
 calcLength [a] = 0
 calcLength route = 
@@ -194,7 +197,7 @@ calcLength route =
       city2x = fromInteger (fst city2)
       city2y = fromInteger (snd city2)
       dy = abs (city1y - city2y)
-      dx = abs (city1x - city1y)
+      dx = abs (city1x - city2x)
       distance = sqrt (dx^2 + dy^2)
       rest = tail route
   in distance + calcLength rest
@@ -211,3 +214,26 @@ calcLength route =
 -- score' function as in package
 score' _ route = Just (calcLength route)
 
+-- genRandom: generate a random entity
+-- a random entity is just a random order of the cities in our map, with the first and the last element being equal
+-- however, it is not possible that in our random generation two cities have the same coordinates (or, we visit a city twice)
+-- pool: a map
+genRandom' pool seed = return $ randomize pool gen ++ [startingPoint]
+  where gen = mkStdGen seed
+        startingPoint = head (randomize pool gen)
+
+randomize :: [City] -> StdGen -> Route
+randomize [] _ = []
+randomize pool gen = 
+  let (randomNr, newGen) = random gen
+      index = randomNr `mod` (length pool)
+      randomElt = pool !! index
+  in randomElt: (randomize (pool\\[randomElt]) newGen)
+
+
+
+
+-- idee: maak met de seed een random generator. Hiermee maak je een getal en een nieuwe gen
+-- dat getal doe je modulo de lengte van pool --> index
+-- neem t element met die index uit pool en zet die vooraan
+-- doe t zelfde voor de pool zonder dat element en een nieuwe generator 
