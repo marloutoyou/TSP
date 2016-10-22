@@ -256,31 +256,37 @@ findRandomIndex gen maxi =
 -- makes a list of tuples of indexes of length n (those tuples are the indexes that get swapped with each other)
 makeIndexList :: Int -> Int -> StdGen -> [(Int, Int)]
 makeIndexList 0 _ _ = []
-makeIndexList n maxi gen = (index1,index2):(makeIndexList (n-1) maxi newGen2)
+makeIndexList n maxi gen = [(index1,index2), (index2, index1)] ++ (makeIndexList (n-1) maxi newGen2)
   where (index1, newGen1) = findRandomIndex gen maxi
         (index2, newGen2) = findRandomIndex newGen1 maxi
 
 -- swap two elements of an entity according to the given indices
-swap :: Int -> Int -> Route -> Route
-swap index1 index2 ent =
-  let len = length ent
-  in foldr (\x list -> if x == index1 then (ent!!index2):list else if x == index2 then (ent!!index1):list else (ent!!x):list) [] [0..len - 1]
+--swap :: Int -> Int -> Route -> Route
+--swap index1 index2 ent =
+--  let len = length ent
+--  in foldr (\x list -> if x == index1 then (ent!!index2):list else if x == index2 then (ent!!index1):list else (ent!!x):list) [] [0..len - 1]
 
 -- given the list of indices that have to be swapped, calculate a new entity
-swapMutate :: [(Int, Int)] -> Route -> Route
-swapMutate [] ent = ent
-swapMutate indices ent = 
-  let (index1, index2) = head indices
-      mutatedEnt = swap index1 index2 ent
-  in swapMutate (tail indices) mutatedEnt
+--swapMutate :: [(Int, Int)] -> Route -> Route
+--swapMutate [] ent = ent
+--swapMutate indices ent = 
+--  let (index1, index2) = head indices
+--      mutatedEnt = swap index1 index2 ent
+--  in swapMutate (tail indices) mutatedEnt
 
--- NOG TESTENNNNNNN
+swapMutate :: [(Int, Int)] -> Route -> Route
+swapMutate indices ent = foldr (\x list -> (find x):list) [] [0..len - 1]
+  where len = length ent
+        find x = case lookup x indices of
+          Just a -> ent!!a
+          Nothing -> ent!!x
 
 -- mutation according to the twors scheme: randomly swap two elements of the entity
 -- the param gives the percentage of the elements that get changed (if we swap one time, two elements get changed!)
+-- NADENKEN OF N WEL EEN GOED GETAL IS
 tworsMutation _ param seed ent = 
   let maxi = length ent
-      n = round (param*maxi*0.5)
+      n = round (0.5*param*(fromIntegral maxi))
       gen = mkStdGen seed
       indices = makeIndexList n maxi gen
   in Just (swapMutate indices ent)
