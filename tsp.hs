@@ -180,6 +180,10 @@ displayRoute route path dim = putStrLn (displayRowRoute route path dim) >> displ
 -- GENERAL STUFF FOR THE GA ALGORITHM
 -----------------------------------------
 
+-- to make a round trip of an entity, which is needed for several functions
+makeRoundTrip :: Route -> Route
+makeRoundTrip route = route ++ [head route]
+
 -- all possible coordinates, needed for creating a pool (= map):
 allCoordinates :: [City]
 allCoordinates = [(x,y) | x <- [0..dim], y <- [0..dim]]
@@ -212,16 +216,17 @@ calcLength route =
 -- and either 'score'', 'score' or 'scorePop'.
 
 -- score' function as in package
-score' _ route = Just (calcLength route)
+-- the lower, the better (as needed with this package)
+score' _ route = Just (calcLength (makeRoundTrip route))
 
 -- genRandom: generate a random entity
 -- a random entity is just a random order of the cities in our map, with the first and the last element being equal
--- however, it is not possible that in our random generation two cities have the same coordinates (or, we visit a city twice)
 -- pool: a map
-genRandom' pool seed = return $ randomize pool gen ++ [startingPoint]
+genRandom' pool seed = return $ randomize pool gen
   where gen = mkStdGen seed
-        startingPoint = head (randomize pool gen)
 
+
+-- NOG DIE RANDOM INDEX FUNCTIE IMPLEMENTEREN?
 randomize :: [City] -> StdGen -> Route
 randomize [] _ = []
 randomize pool gen = 
@@ -231,9 +236,51 @@ randomize pool gen =
   in randomElt: (randomize (pool\\[randomElt]) newGen)
 
 
+-- hill-climbing mutatie (en ook crossover?) versnelt t gebeuren wel, maar zorgt er ook voor dat je werkt naar lokale optima..
 
+-- 4 mutaties? RSM/PSM/ de meest basic en een eigen? 
 
--- idee: maak met de seed een random generator. Hiermee maak je een getal en een nieuwe gen
--- dat getal doe je modulo de lengte van pool --> index
--- neem t element met die index uit pool en zet die vooraan
--- doe t zelfde voor de pool zonder dat element en een nieuwe generator 
+--crossover' pool param seed ent1 ent2 =
+
+-- parameter: % van mutaties die plaatsvinden --> GOED IDEE OM DIE STANDAARD TE ZETTEN OP PERCENTAGE VAN WAT VERANDERT?
+
+-- TWORS MUTATIE: NU MAAK JE IEDERE KEER EEN NIEUWE ENTITY EN SWAP JE 1X PER KEER, MISSCHIEN HANDIGERE MANIER??
+
+-- finds a random index
+findRandomIndex :: StdGen -> Int -> (Int, StdGen)
+findRandomIndex gen maxi =
+  let (randomNr, newGen) = random gen
+      index = randomNr `mod` maxi
+  in (index, newGen)
+
+-- makes a list of tuples of indexes of length n (those tuples are the indexes that get swapped with each other)
+makeIndexList :: Int -> Int -> StdGen -> [(Int, Int)]
+makeIndexList 0 _ _ = []
+makeIndexList n maxi gen = (index1,index2):(makeIndexList (n-1) maxi newGen2)
+  where (index1, newGen1) = findRandomIndex gen maxi
+        (index2, newGen2) = findRandomIndex newGen1 maxi
+
+-- swap two elements of an entity according to the given indices
+swap :: Int -> Int -> Route -> Route
+swap index1 index2 ent =
+  let len = length ent
+  in foldr (\x list -> if x == index1 then (ent!!index2):list else if x == index2 then (ent!!index1):list else (ent!!x):list) [] [0..len - 1]
+
+-- given the list of indices that have to be swapped, calculate a new entity
+swapMutate :: [(Int, Int)] -> Route -> Route
+swapMutate [] ent = ent
+swapMutate indices ent = 
+  let (index1, index2) = head indices
+      mutatedEnt = swap index1 index2 ent
+  in swapMutate (tail indices) mutatedEnt
+
+-- NOG TESTENNNNNNN
+
+-- mutation according to the twors scheme: randomly swap two elements of the entity
+-- the param gives the percentage of the elements that get changed (if we swap one time, two elements get changed!)
+tworsMutation _ param seed ent = 
+  let maxi = length ent
+      n = round (param*maxi*0.5)
+      gen = mkStdGen seed
+      indices = makeIndexList n maxi gen
+  in Just (swapMutate indices ent)
