@@ -215,18 +215,22 @@ calcLength route =
 -- Minimal implementation should include 'genRandom', 'crossover', 'mutation', 
 -- and either 'score'', 'score' or 'scorePop'.
 
+-- SCORE
 -- score' function as in package
 -- the lower, the better (as needed with this package)
 score' _ route = Just (calcLength (makeRoundTrip route))
 
+
+-- GENRANDOM
 -- genRandom: generate a random entity
--- a random entity is just a random order of the cities in our map, with the first and the last element being equal
+-- a random entity is just a random order of the cities in our map
 -- pool: a map
 genRandom' pool seed = return $ randomize pool gen
   where gen = mkStdGen seed
 
 
 -- NOG DIE RANDOM INDEX FUNCTIE IMPLEMENTEREN?
+-- NU WORDT IEDERE KEER DE LENGTE VAN POOL UITGEREKEND?
 randomize :: [City] -> StdGen -> Route
 randomize [] _ = []
 randomize pool gen = 
@@ -281,12 +285,33 @@ swapMutate indices ent = foldr (\x list -> (find x):list) [] [0..len - 1]
           Just a -> ent!!a
           Nothing -> ent!!x
 
+-- MUTATION
 -- mutation according to the twors scheme: randomly swap two elements of the entity
 -- the param gives the percentage of the elements that get changed (if we swap one time, two elements get changed!)
 -- NADENKEN OF N WEL EEN GOED GETAL IS
 tworsMutation _ param seed ent = 
   let maxi = length ent
+      -- we multiply by 0.5, because makeIndexList returns 2 indexes to swap for every n, so you "change" 2n element of the entity
       n = round (0.5*param*(fromIntegral maxi))
       gen = mkStdGen seed
       indices = makeIndexList n maxi gen
   in Just (swapMutate indices ent)
+
+-- CROSSOVER
+-- ordered crossover: we take 2 random indices, and select from parent1 the part/slice that is between those 
+-- if index1 = index2, we take the empty list. 
+-- we let that slice be in the same position for the child, and before and after we fill it with the rest of the cities, 
+-- in the same order as they appear in parent2
+orderedCrossover _ _ seed ent1 ent2 = 
+  let gen = mkStdGen seed
+      maxi = length ent1
+      (index', newGen) = findRandomIndex gen maxi
+      (index'', _) = findRandomIndex newGen maxi
+      -- we need to add 1 to the highest index in order to be able to take the end of ent1 
+      -- (otherwise we can only select slices without the last element)
+      (index1, index2) = case index' >= index'' of
+        True -> (index'', index' + 1)
+        _ -> (index', index'' + 1)
+      partition = take (index2 - index1) . drop index1 $ ent1
+      leftover = foldl (\newEnt x -> if elem x partition then newEnt else newEnt ++ [x]) [] ent2
+  in Just ((take index1 leftover) ++ partition ++ (drop index1 leftover))
