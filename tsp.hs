@@ -76,7 +76,7 @@ big = 100000
 -- variabelen: population_size enzo ook hier? dan kan je alles makkelijk vanaf bovenaan instellen
 
 dumMap :: Map
-dumMap = [(1,5),(20,20),(6,4),(7,15),(12,4)]
+dumMap = [(1,1),(10,1),(19,1),(19,10),(19,19),(10,19),(1,19),(1,10)]
 
 -----------------------------------------------------------------------------------------------------------------------------
 
@@ -87,7 +87,7 @@ dumMap = [(1,5),(20,20),(6,4),(7,15),(12,4)]
 
 ------------------------------------------------------------------
 -- for displaying a map with cities
-------------------------------------------------------------------
+
 
 -- helper for displayMap
 -- display the row for a map. Cities are represented by an x 
@@ -102,7 +102,7 @@ displayMap cities dim = putStrLn (displayRowMap cities dim) >> displayMap cities
 
 ---------------------------------------------------------------------
 -- functions for calculating the points on a path between two cities
----------------------------------------------------------------------
+
 
 -- First we calculate the line between two points. 
 -- Since we cannot display that with IO, the points are rounded as integers and displayed with a * on the map
@@ -166,30 +166,27 @@ findPath route =
 
 ------------------------------------------------------------------
 -- for displaying a route 
-------------------------------------------------------------------
+
 
 -- helper function for displayRoute
 -- displaying the row of a route. Cities are an x, points of the path are a *
 displayRowRoute :: Route -> Path -> Integer -> String
-displayRowRoute route path row = foldl (\y x -> if elem (row,x) route then y ++ "x " else if elem (row,x) path then y ++ "* " else y ++ "- ") "" [0..dim]
+displayRowRoute route path row = foldl (\y x -> if elem (row,x) route then y ++ "x " else if elem (row,x) path then y ++ "* " else y ++ "  ") "" [0..dim] ++ "\n"
 
 -- display a route!
-displayRoute :: Route -> Path -> Integer -> IO()
-displayRoute _ _ (-1) = return ()
-displayRoute route path dim = putStrLn (displayRowRoute route path dim) >> displayRoute route path (dim - 1)
+displayRoute :: Route -> Path -> Integer -> String
+displayRoute _ _ (-1) = ""
+displayRoute route path dim = (displayRowRoute route path dim) ++ displayRoute route path (dim - 1)
+
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------
------------------------------------------
--- GENERAL STUFF FOR THE GA ALGORITHM
------------------------------------------
+---------------------------------------------
+-- GENERAL STUFF NEEDED FOR THE GA ALGORITHM 
+---------------------------------------------
 
 -- to make a round trip of an entity, which is needed for several functions
 makeRoundTrip :: Route -> Route
 makeRoundTrip route = route ++ [head route]
-
--- all possible coordinates, needed for creating a pool (= map):
-allCoordinates :: [City]
-allCoordinates = [(x,y) | x <- [0..dim], y <- [0..dim]]
 
 -- fitness:
 -- calculate length of route, returned as a float
@@ -209,28 +206,6 @@ calcLength route =
       rest = tail route
   in distance + calcLength rest
 
------------------------------------------------------------------------------------------------------------------------------------------------
---------------------------------------------
--- REQUIRED FUNCTIONS
---------------------------------------------
-
--- copied from the package: 
--- Minimal implementation should include 'genRandom', 'crossover', 'mutation', 
--- and either 'score'', 'score' or 'scorePop'.
-
--- SCORE
--- score' function as in package
--- the lower, the better (as needed with this package)
-score'' _ route = Just (calcLength (makeRoundTrip route))
-
-
--- GENRANDOM
--- genRandom: generate a random entity
--- a random entity is just a random order of the cities in our map
--- pool: a map
-genRandom' pool seed = return $ randomize pool gen
-  where gen = mkStdGen seed
-
 
 -- NOG DIE RANDOM INDEX FUNCTIE IMPLEMENTEREN?
 -- NU WORDT IEDERE KEER DE LENGTE VAN POOL UITGEREKEND?
@@ -242,16 +217,6 @@ randomize pool gen =
       randomElt = pool !! index
   in randomElt: (randomize (pool\\[randomElt]) newGen)
 
-
--- hill-climbing mutatie (en ook crossover?) versnelt t gebeuren wel, maar zorgt er ook voor dat je werkt naar lokale optima..
-
--- 4 mutaties? RSM/PSM/ de meest basic en een eigen? 
-
---crossover' pool param seed ent1 ent2 =
-
--- parameter: % van mutaties die plaatsvinden --> GOED IDEE OM DIE STANDAARD TE ZETTEN OP PERCENTAGE VAN WAT VERANDERT?
-
--- TWORS MUTATIE: NU MAAK JE IEDERE KEER EEN NIEUWE ENTITY EN SWAP JE 1X PER KEER, MISSCHIEN HANDIGERE MANIER??
 
 -- finds a random index
 findRandomIndex :: StdGen -> Int -> (Int, StdGen)
@@ -267,26 +232,72 @@ makeIndexList n maxi gen = [(index1,index2), (index2, index1)] ++ (makeIndexList
   where (index1, newGen1) = findRandomIndex gen maxi
         (index2, newGen2) = findRandomIndex newGen1 maxi
 
+-- given the list of indices that have to be swapped, calculate a new entity
+swapIndices :: [(Int, Int)] -> Route -> Route
+swapIndices indices ent = foldr (\x list -> (find x):list) [] [0..len - 1]
+  where len = length ent
+        find x = case lookup x indices of
+          Just a -> ent!!a
+          Nothing -> ent!!x
+
+-----------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------
+-- FUNCTIONS FOR THE GA (so no types)
+--------------------------------------------
+
+-- copied from the package: 
+-- "Minimal implementation should include 'genRandom', 'crossover', 'mutation', 
+-- and either 'score'', 'score' or 'scorePop'.
+-- The 'isPerfect', 'showGeneration' and 'hasConverged' functions are optional."
+
+-- SHOWGENERATION
+-- for displaying the route during the evolving. Same types as showGeneration in the package
+showRoute gi (_, archive) = "best entity (gen. " ++ show gi ++ "): "
+                            ++ "\n"
+                            ++ (displayRoute route path dim)
+                            ++ "\n"
+                            ++ " [fitness: " ++ show fitness ++ "]"
+                          where
+                            (Just fitness, e) = head archive
+                            route = makeRoundTrip e
+                            path = findPath route
+
+-- SCORE
+-- score' function as in package
+-- the lower, the better (as needed with this package)
+score'' _ route = Just (calcLength (makeRoundTrip route))
+
+
+-- GENRANDOM
+-- genRandom: generate a random entity
+-- a random entity is just a random order of the cities in our map
+-- pool: a map
+genRandom' pool seed = return $ randomize pool gen
+  where gen = mkStdGen seed
+
+
+
+
+-- hill-climbing mutatie (en ook crossover?) versnelt t gebeuren wel, maar zorgt er ook voor dat je werkt naar lokale optima..
+
+-- 4 mutaties? RSM/PSM/ de meest basic en een eigen? 
+
+--crossover' pool param seed ent1 ent2 =
+
+-- parameter: % van mutaties die plaatsvinden --> GOED IDEE OM DIE STANDAARD TE ZETTEN OP PERCENTAGE VAN WAT VERANDERT?
+
+-- TWORS MUTATIE: NU MAAK JE IEDERE KEER EEN NIEUWE ENTITY EN SWAP JE 1X PER KEER, MISSCHIEN HANDIGERE MANIER??
+
+
 -- swap two elements of an entity according to the given indices
 --swap :: Int -> Int -> Route -> Route
 --swap index1 index2 ent =
 --  let len = length ent
 --  in foldr (\x list -> if x == index1 then (ent!!index2):list else if x == index2 then (ent!!index1):list else (ent!!x):list) [] [0..len - 1]
 
--- given the list of indices that have to be swapped, calculate a new entity
---swapMutate :: [(Int, Int)] -> Route -> Route
---swapMutate [] ent = ent
---swapMutate indices ent = 
---  let (index1, index2) = head indices
---      mutatedEnt = swap index1 index2 ent
---  in swapMutate (tail indices) mutatedEnt
 
-swapMutate :: [(Int, Int)] -> Route -> Route
-swapMutate indices ent = foldr (\x list -> (find x):list) [] [0..len - 1]
-  where len = length ent
-        find x = case lookup x indices of
-          Just a -> ent!!a
-          Nothing -> ent!!x
+
+
 
 -- MUTATION
 -- mutation according to the twors scheme: randomly swap two elements of the entity
@@ -298,7 +309,7 @@ tworsMutation _ param seed ent =
       n = round (0.5*param*(fromIntegral maxi))
       gen = mkStdGen seed
       indices = makeIndexList n maxi gen
-  in return $ Just (swapMutate indices ent)
+  in return $ Just (swapIndices indices ent)
 
 -- CROSSOVER
 -- ordered crossover: we take 2 random indices, and select from parent1 the part/slice that is between those 
@@ -335,13 +346,15 @@ instance Entity Route Float () Map IO where
 
   crossover = orderedCrossover
 
+  showGeneration = showRoute
+
 
 main :: IO()
 main = do
         let cfg = GAConfig 
                     200 -- population size
                     25 -- archive size (best entities to keep track of)
-                    100 -- maximum number of generations
+                    5 -- maximum number of generations
                     0.8 -- crossover rate (% of entities by crossover)
                     0.2 -- mutation rate (% of entities by mutation)
                     0.0 -- parameter for crossover (not used here)
@@ -350,15 +363,12 @@ main = do
                     False -- don't rescore archive in each generation
 
             g = mkStdGen 0 -- random generator
-        -- Do the evolution!
-        -- Note: if either of the last two arguments is unused, just use () as a value
-
             pool = dumMap
 
         es <- evolveVerbose g cfg pool ()
         let e = snd $ head es :: Route
         
-        --putStrLn $ "best entity (GA): " ++ (show e)
+        putStrLn $ "best entity (GA): " ++ (show e)
 
         -- Compare with random search with large budget
         -- 100k random entities, equivalent to 1000 generations of GA
