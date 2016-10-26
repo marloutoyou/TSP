@@ -45,7 +45,9 @@
 
 ----------------------------------------------------------------------------------------------------------------------
 
-
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 ---------------------------------------------
 -- Imports and types and starter variables
@@ -53,7 +55,8 @@
 
 import Data.List
 import System.Random
-import GA
+import GA 
+import Data.Ord (comparing)
 
 type City = (Integer, Integer)
 type Route = [City] -- gives the cities in order of the route
@@ -218,7 +221,7 @@ calcLength route =
 -- SCORE
 -- score' function as in package
 -- the lower, the better (as needed with this package)
-score' _ route = Just (calcLength (makeRoundTrip route))
+score'' _ route = Just (calcLength (makeRoundTrip route))
 
 
 -- GENRANDOM
@@ -231,7 +234,7 @@ genRandom' pool seed = return $ randomize pool gen
 
 -- NOG DIE RANDOM INDEX FUNCTIE IMPLEMENTEREN?
 -- NU WORDT IEDERE KEER DE LENGTE VAN POOL UITGEREKEND?
-randomize :: [City] -> StdGen -> Route
+randomize :: Map -> StdGen -> Route
 randomize [] _ = []
 randomize pool gen = 
   let (randomNr, newGen) = random gen
@@ -295,7 +298,7 @@ tworsMutation _ param seed ent =
       n = round (0.5*param*(fromIntegral maxi))
       gen = mkStdGen seed
       indices = makeIndexList n maxi gen
-  in Just (swapMutate indices ent)
+  in return $ Just (swapMutate indices ent)
 
 -- CROSSOVER
 -- ordered crossover: we take 2 random indices, and select from parent1 the part/slice that is between those 
@@ -314,4 +317,52 @@ orderedCrossover _ _ seed ent1 ent2 =
         _ -> (index', index'' + 1)
       partition = take (index2 - index1) . drop index1 $ ent1
       leftover = foldl (\newEnt x -> if elem x partition then newEnt else newEnt ++ [x]) [] ent2
-  in Just ((take index1 leftover) ++ partition ++ (drop index1 leftover))
+  in return $ Just ((take index1 leftover) ++ partition ++ (drop index1 leftover))
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+
+instance Entity Route Float () Map IO where
+
+  genRandom = genRandom'
+
+  score' = score''
+
+  mutation = tworsMutation
+
+  crossover = orderedCrossover
+
+
+main :: IO()
+main = do
+        let cfg = GAConfig 
+                    200 -- population size
+                    25 -- archive size (best entities to keep track of)
+                    100 -- maximum number of generations
+                    0.8 -- crossover rate (% of entities by crossover)
+                    0.2 -- mutation rate (% of entities by mutation)
+                    0.0 -- parameter for crossover (not used here)
+                    0.2 -- parameter for mutation (% of changed cities)
+                    False -- whether or not to use checkpointing
+                    False -- don't rescore archive in each generation
+
+            g = mkStdGen 0 -- random generator
+        -- Do the evolution!
+        -- Note: if either of the last two arguments is unused, just use () as a value
+
+            pool = dumMap
+
+        es <- evolveVerbose g cfg pool ()
+        let e = snd $ head es :: Route
+        
+        --putStrLn $ "best entity (GA): " ++ (show e)
+
+        -- Compare with random search with large budget
+        -- 100k random entities, equivalent to 1000 generations of GA
+        es' <- randomSearch g 100000 pool ()
+        let e' = snd $ head es' :: Route
+       
+        putStrLn $ "best entity (random search): " ++ (show e')
