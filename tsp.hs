@@ -1,49 +1,12 @@
 ----------------------------------
--- NOTES
+-- NOTES AND STUFF TO BEGIN WITH
 ---------------------------------
 
--- ook zorgen dat t goed wordt weergegeven.
--- mogelijke volgorde van dingen doen:
--- eerst initial population (LET OP DAT NIET 2 DEZELFDE COORDINATEN MOGELIJK!!) en search population doen, en een dummie next generation (jatten?)
--- dan zorgen dat alles wordt weergegeven 
--- verschillende next generation dingetjes implementeren
--- dit alles testen op verschillende dingen, zie ideeen
--- weergave optimaliseren?
-
--- ideeen:
--- Wat als niks muteert en je alleen selecteert? vergelijkingen maken met verschillende percentages mutatie
--- hoeveel individueen van vorige populatie naar volgende? ("elitism"?)--> ook varieren
--- wat voor soort "maps" worden sneller opgelost? Wat als de steden al soort van in een cirkel zitten bvb
-
-
--- misschien niet zoals echte evolutie gaan zoeken naar waarom iets een goede fit is (kijken, welk stukje van de tour is kort, vergeleken met anderen?)
--- maar hoe kan je dat vergelijken?
--- kan wel zoeken naar opeenvolgende steden die in de route erg dicht bij elkaar zitten
--- je kan een soort gemiddelde afstand berekenen en dan kijken wat daar (ver?) onder ligt
-
-
-
-
--- 3 functies? InitialPopulation, NextGeneration, SearchPopulation
--- SearchPopulation : blijft de volgende generatie berekenen tot aan eis is voldaan of terminatie conditie bereikt
-
--- InitialPopulation : maakt de begin populatie door random tours te genereren, net zoveel als de populatie grootte
-
--- NextGeneration : waar t om draait! artikel: selection/mutation/crossover cycle
--- onderdelen: calcFitness : de lengte van de route
--- verschillende selection manieren bekijken (+ implementeren?)
-
-
--- met dat framework: eigen showGeneration maken
-
-
--- bepalen: dimensies van kaart en hoe weer te geven?
--- functie displayRoute
-
-
--- Monad IO gebruiken?? Dus overal waar m --> IO
+-- HLINTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+-- GA AL HET COMMENTAAR NA!!
 
 ----------------------------------------------------------------------------------------------------------------------
+-- needed for the instance declaration
 
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -73,10 +36,15 @@ dim = 20
 big :: Float
 big = 100000
 
+-- needed for one of the functions
+noCity :: City
+noCity = (-1, -1)
+
+
 -- variabelen: population_size enzo ook hier? dan kan je alles makkelijk vanaf bovenaan instellen
 
 dumMap :: Map
-dumMap = [(1,1),(10,1),(19,1),(19,10),(19,19),(10,19),(1,19),(1,10)]
+dumMap = [(1,1),(11,1),(19,1),(19,9),(19,19),(10,19),(1,19),(1,3)]
 
 -----------------------------------------------------------------------------------------------------------------------------
 
@@ -92,7 +60,7 @@ dumMap = [(1,1),(10,1),(19,1),(19,10),(19,19),(10,19),(1,19),(1,10)]
 -- helper for displayMap
 -- display the row for a map. Cities are represented by an x 
 displayRowMap :: Map -> Integer -> String
-displayRowMap cities row = foldl (\y x -> if elem (row,x) cities then y ++ "x " else y ++ "- ") "" [0..dim]
+displayRowMap cities row = foldl (\y x -> if elem (x,row) cities then y ++ "x " else y ++ "- ") "" [0..dim]
 
 -- display the map with cities
 displayMap :: Map -> Integer -> IO()
@@ -171,7 +139,7 @@ findPath route =
 -- helper function for displayRoute
 -- displaying the row of a route. Cities are an x, points of the path are a *
 displayRowRoute :: Route -> Path -> Integer -> String
-displayRowRoute route path row = foldl (\y x -> if elem (row,x) route then y ++ "x " else if elem (row,x) path then y ++ "* " else y ++ "  ") "" [0..dim] ++ "\n"
+displayRowRoute route path row = foldl (\y x -> if elem (x,row) route then y ++ "x " else if elem (x,row) path then y ++ "* " else y ++ "  ") "" [0..dim] ++ "\n"
 
 -- display a route!
 displayRoute :: Route -> Path -> Integer -> String
@@ -191,20 +159,24 @@ makeRoundTrip route = route ++ [head route]
 -- fitness:
 -- calculate length of route, returned as a float
 -- requires that the first and the last element of route are equal (to make a circle)
-calcLength :: Route -> Float
-calcLength [a] = 0
-calcLength route = 
-  let city1 = head route
-      city2 = head (tail route)
-      city1x = fromInteger (fst city1)
+calcLength :: City -> City -> Float
+calcLength city1 city2 = 
+  let city1x = fromInteger (fst city1)
       city1y = fromInteger (snd city1)
       city2x = fromInteger (fst city2)
       city2y = fromInteger (snd city2)
       dy = abs (city1y - city2y)
       dx = abs (city1x - city2x)
-      distance = sqrt (dx^2 + dy^2)
+  in sqrt (dx^2 + dy^2)
+
+calcTotalLength :: Route -> Float
+calcTotalLength [a] = 0
+calcTotalLength route = 
+  let city1 = head route
+      city2 = head (tail route)
+      distance = calcLength city1 city2
       rest = tail route
-  in distance + calcLength rest
+  in distance + calcTotalLength rest
 
 
 -- NOG DIE RANDOM INDEX FUNCTIE IMPLEMENTEREN?
@@ -240,6 +212,69 @@ swapIndices indices ent = foldr (\x list -> (find x):list) [] [0..len - 1]
           Just a -> ent!!a
           Nothing -> ent!!x
 
+------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------
+-- FUNCTIONS FOR THE SELECTIVE ALGORITHMS
+-------------------------------------------------------------
+-- calculate the average distance between two cities in a route
+-- then find a big as possible slice which has a distance that is lower then average/ for which all the distances are lower then average
+-- this is done by: finding the tuples for which in between there is a distance lower then average
+-- find the largest "adjecent" tuple (or just the first)
+-- use that for the crossover
+
+-- calculates the average distance of a route
+-- requires that the first and last element of the route are the same
+averageDistance :: Route -> Float
+averageDistance route =
+  let n = length route
+      totalDistance = calcTotalLength route
+  in totalDistance / (fromIntegral n)
+
+-- let the tuples appear in the same order as the route
+findSmallDistances :: Route -> Float -> [(City,City)]
+findSmallDistances [a] _ = []
+findSmallDistances route average = 
+  let city1 = head route
+      city2 = head (tail route)
+      distance = calcLength city1 city2
+      rest = tail route 
+      tuple = case (distance <= average) of
+        True -> (city1, city2)
+        False -> (noCity, noCity)
+  in tuple:(findSmallDistances rest average)
+
+lengthSlice :: [(City, City)] -> City -> Int -> (Int, [(City, City)])
+lengthSlice [] city n = (n, [])
+lengthSlice smalls city n =
+  if (fst (head smalls) == city) then
+    lengthSlice (tail smalls) (snd (head smalls)) (n + 1)
+  else
+    (n, smalls)
+
+
+-- there has to be at least one tuple wich is not a noCity (pigeonhole principle)
+-- the tuples have appear in order of the route 
+calcSmallLengths :: [(City, City)] ->  [(Int,City)]
+calcSmallLengths [] = []
+calcSmallLengths smalls =
+  let tuple = head smalls
+  in if tuple == (noCity, noCity) then 
+      calcSmallLengths (tail smalls)
+    else 
+      let a = fst tuple -- a city
+          b = snd tuple 
+          (n, rest) = lengthSlice (tail smalls) b 1
+      in (n, a):(calcSmallLengths rest)
+
+
+-- ideeen voor mutatie: als een stad voorkomt als eerste element in de lijst gegenereerd door lengthSlice,
+-- dan index van die stad EN die index + 1 NIET muteren
+-- DOOR PIGEONHOLE MOETEN ER ALTIJD 2 VAN DIE STEDEN ZIJN
+-- MAAR DAN MOET JE DUS MAAR 2 DINGEN WISSELEN, EN NIET MEER!
+
+
+
+
 -----------------------------------------------------------------------------------------------------------------------------------------------
 --------------------------------------------
 -- FUNCTIONS FOR THE GA (so no types)
@@ -265,7 +300,7 @@ showRoute gi (_, archive) = "best entity (gen. " ++ show gi ++ "): "
 -- SCORE
 -- score' function as in package
 -- the lower, the better (as needed with this package)
-score'' _ route = Just (calcLength (makeRoundTrip route))
+score'' _ route = Just (calcTotalLength (makeRoundTrip route))
 
 
 -- GENRANDOM
@@ -276,27 +311,11 @@ genRandom' pool seed = return $ randomize pool gen
   where gen = mkStdGen seed
 
 
-
-
--- hill-climbing mutatie (en ook crossover?) versnelt t gebeuren wel, maar zorgt er ook voor dat je werkt naar lokale optima..
-
--- 4 mutaties? RSM/PSM/ de meest basic en een eigen? 
-
---crossover' pool param seed ent1 ent2 =
-
--- parameter: % van mutaties die plaatsvinden --> GOED IDEE OM DIE STANDAARD TE ZETTEN OP PERCENTAGE VAN WAT VERANDERT?
-
--- TWORS MUTATIE: NU MAAK JE IEDERE KEER EEN NIEUWE ENTITY EN SWAP JE 1X PER KEER, MISSCHIEN HANDIGERE MANIER??
-
-
 -- swap two elements of an entity according to the given indices
 --swap :: Int -> Int -> Route -> Route
 --swap index1 index2 ent =
 --  let len = length ent
 --  in foldr (\x list -> if x == index1 then (ent!!index2):list else if x == index2 then (ent!!index1):list else (ent!!x):list) [] [0..len - 1]
-
-
-
 
 
 -- MUTATION
