@@ -48,15 +48,23 @@ noCity = (-1, -1)
 
 -- the dimension of the map
 dim :: Integer
-dim = 1750
+dim = 70
 
--- the map used as a pool
+
 dummyMap :: Map
 dummyMap = [(1,1),(11,1),(19,1),(19,9),(19,19),(10,19),(1,19),(1,3)]
 
+-- known TSP problems: 
 -- dimension: 1750
+-- optimal solution: 7542
 berlin52 :: Map
 berlin52 = [(565, 575),(25, 185), (345, 750), (945, 685), (845, 655), (880, 660), (25, 230), (525, 1000), (580, 1175), (650, 1130), (1605, 620), (1220, 580), (1465, 200), (1530, 5), (845, 680), (725, 370), (145, 665), (415, 635), (510, 875), (560, 365), (300, 465), (520, 585), (480, 415), (835, 625), (975, 580), (1215, 245), (1320, 315), (1250, 400), (660, 180), (410, 250), (420, 555), (575, 665), (1150, 1160), (700, 580), (685, 595), (685, 610), (770, 610), (795, 645), (720, 635), (760, 650), (475, 960), (95, 260), (875, 920), (700, 500), (555, 815), (830, 485), (1170, 65), (830, 610), (605, 625), (595, 360), (1340, 725), (1740, 245)]
+
+-- dimension: 70
+-- optimal solution: 426
+-- this is just small enough to fit on the screen when displaying the entire route on a grid! I recommend you do this.
+eil51 :: Map
+eil51 = [(37, 52), (49, 49), (52, 64), (20, 26), (40, 30), (21, 47), (17, 63), (31, 62), (52, 33), (51, 21), (42, 41), (31, 32), (5, 25), (12, 42), (36, 16), (52, 41), (27, 23), (17, 33), (13, 13), (57, 58), (62, 42), (42, 57), (16, 57), (8, 52), (7, 38), (27, 68), (30, 48), (43, 67), (58, 48), (58, 27), (37, 69), (38, 46), (46, 10), (61, 33), (62, 63), (63, 69), (32, 22), (45, 35), (59, 15), (5, 6), (10, 17), (21, 10), (5, 64), (30, 15), (39, 10), (32, 39), (25, 32), (25, 55), (48, 28), (56, 37), (30, 40)]
 
 
 -----------------------------------------------------------------------------------------------------------------------------
@@ -272,11 +280,11 @@ findSmallDistances route average =
       tuple = if distance <= average then (city1, city2) else (noCity, noCity)
   in tuple:findSmallDistances rest average
 
--- calculates the number of adjecent tuples/cities that were given by findSmallDistances,
+-- calculates the number of adjacent tuples/cities that were given by findSmallDistances,
 -- starting with city
 -- that gives the length of a subpath (starting with city) from the route, for which all the distances between the cities are <= average 
 -- the result is then "(length, leftover tuples from the small distances)"  
--- (leftover tuples are cities that were not adjecent to the previous one in the route)
+-- (leftover tuples are cities that were not adjacent to the previous one in the route)
 lengthSlice :: [(City, City)] -> City -> Int -> (Int, [(City, City)])
 lengthSlice [] city n = (n, [])
 lengthSlice smalls city n =
@@ -443,7 +451,7 @@ instance Entity Route Float () Map IO where
 
   crossover = selectiveCrossover
 
-  -- showGeneration = showRoute
+  showGeneration = showRoute
 
 
 main :: IO()
@@ -459,8 +467,8 @@ main = do
                     False -- whether or not to use checkpointing
                     False -- don't rescore archive in each generation
 
-            g = mkStdGen 0 -- random generator
-            pool = berlin52
+            g = mkStdGen 2 -- random generator
+            pool = eil51
 
         es <- evolveVerbose g cfg pool ()
         let e = snd $ head es :: Route
@@ -470,6 +478,7 @@ main = do
         putStrLn $ "length: " ++ show eLen
 
 
+        -- from the examples that go with the package: 
         -- Compare with random search with large budget
         -- 100k random entities, equivalent to 1000 generations of GA
         --es' <- randomSearch g 100000 pool ()
