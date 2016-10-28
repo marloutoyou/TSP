@@ -1,9 +1,18 @@
 ----------------------------------
 -- NOTES AND STUFF TO BEGIN WITH
 ---------------------------------
+-- FSA: Marlou Gijzen, 10430695
 
--- HLINTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
--- GA AL HET COMMENTAAR NA!!
+-- this contains code for solving TSP with a genetic algorithm.
+-- For this, the package GA is used.
+-- there are two crossover and two mutation operators
+-- one of them is random, and the other is selective (in both cases)
+-- it also contains code for displaying the routes in the terminal
+-- at the top of this code (below the imports), you can set a dimension and a map
+-- at the bottom of this code, you can set the crossover and mutation functions 
+-- if you want to use a very big map, that cannot be displayed,
+-- then you can uncomment the showGen = .. in the entity declaration
+-- then the routes will not be displayed in a grid but as a list of tuples
 
 ----------------------------------------------------------------------------------------------------------------------
 -- needed for the instance declaration
@@ -27,10 +36,6 @@ type Population = [Route]
 type Map = [City] -- not necessarily a route, just the coordinates of the cities
 type Path = [(Integer, Integer)] -- for the coordinates of the paths between the cities
 
--- the dimension of the map
-dim :: Integer
-dim = 20
-
 big :: Float
 big = 100000
 
@@ -38,6 +43,14 @@ big = 100000
 noCity :: City
 noCity = (-1, -1)
 
+------------------------
+-- these you can adjust: 
+
+-- the dimension of the map
+dim :: Integer
+dim = 20
+
+-- the map used as a pool
 dummyMap :: Map
 dummyMap = [(1,1),(11,1),(19,1),(19,9),(19,19),(10,19),(1,19),(1,3)]
 
