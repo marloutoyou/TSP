@@ -230,7 +230,9 @@ averageDistance route =
       totalDistance = calcTotalLength route
   in totalDistance / (fromIntegral n)
 
+-- COMMENTS
 -- let the tuples appear in the same order as the route
+-- requires that the first and last element of the route are the same
 findSmallDistances :: Route -> Float -> [(City,City)]
 findSmallDistances [a] _ = []
 findSmallDistances route average = 
@@ -267,10 +269,22 @@ calcSmallLengths smalls =
       in (n, a):(calcSmallLengths rest)
 
 
+-- does NOT require that the fist and last element are the same
+getLongestSmall :: Route -> (Int, City)
+getLongestSmall route =
+  let trip = makeRoundTrip route
+      average = averageDistance trip
+      smalls = findSmallDistances trip average
+      lengths = calcSmallLengths smalls
+  in last (sort lengths)
+
+
+
 -- ideeen voor mutatie: als een stad voorkomt als eerste element in de lijst gegenereerd door lengthSlice,
 -- dan index van die stad EN die index + 1 NIET muteren
--- DOOR PIGEONHOLE MOETEN ER ALTIJD 2 VAN DIE STEDEN ZIJN
+-- DOOR PIGEONHOLE MOETEN ER ALTIJD 2 VAN DIE STEDEN ZIJN 
 -- MAAR DAN MOET JE DUS MAAR 2 DINGEN WISSELEN, EN NIET MEER!
+-- ander idee: kies random indexes, als small lengths dan index + lengte small lengts mod length
 
 
 
@@ -330,6 +344,20 @@ tworsMutation _ param seed ent =
       indices = makeIndexList n maxi gen
   in return $ Just (swapIndices indices ent)
 
+selectiveMutation _ _ seed ent =
+  let longestSmall = getLongestSmall ent
+      maxi = length ent
+      gen = mkStdGen seed
+      indices = makeIndexList 1 maxi gen
+      index1' = fst (head indices)
+      index2' = snd (head indices)
+      Just a = elemIndex (snd longestSmall) ent
+      b = a + (fst longestSmall) + 1
+
+
+
+
+
 -- CROSSOVER
 -- ordered crossover: we take 2 random indices, and select from parent1 the part/slice that is between those 
 -- if index1 = index2, we take the empty list. 
@@ -346,6 +374,15 @@ orderedCrossover _ _ seed ent1 ent2 =
         True -> (index'', index' + 1)
         _ -> (index', index'' + 1)
       partition = take (index2 - index1) . drop index1 $ ent1
+      leftover = foldl (\newEnt x -> if elem x partition then newEnt else newEnt ++ [x]) [] ent2
+  in return $ Just ((take index1 leftover) ++ partition ++ (drop index1 leftover))
+
+
+selectiveCrossover _ _ _ ent1 ent2 =
+  let longestSmall = getLongestSmall ent1 -- == (length of slice, starting point)
+      Just a = elemIndex (snd longestSmall) ent1
+      b = a + (fst longestSmall) + 1
+      partition = take (b - a) . drop a $ ent1 -- this is now precisely the small slice
       leftover = foldl (\newEnt x -> if elem x partition then newEnt else newEnt ++ [x]) [] ent2
   in return $ Just ((take index1 leftover) ++ partition ++ (drop index1 leftover))
 
